@@ -1,0 +1,46 @@
+name: Build Mario Kart PSP
+
+"on": [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check project files
+        run: |
+          test -f main.c
+          test -f char_models.h
+          test -f kart_models.h
+          test -f CMakeLists.txt
+          test -f assets_pack.zip
+
+      - name: Build with PSPDEV
+        run: |
+          docker pull pspdev/pspdev:latest
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/source" \
+            -w /source \
+            pspdev/pspdev:latest \
+            sh -c 'rm -rf build && mkdir build && cd build && psp-cmake .. && make -j2'
+
+      - name: Package game and assets
+        run: |
+          test -f build/EBOOT.PBP
+          mkdir -p release/PSP/GAME/MarioKartPSP
+          cp build/EBOOT.PBP release/PSP/GAME/MarioKartPSP/EBOOT.PBP
+          unzip -oq assets_pack.zip -d release/PSP/GAME/MarioKartPSP
+          test -f release/PSP/GAME/MarioKartPSP/assets/textures/tyre.png
+          test -f release/PSP/GAME/MarioKartPSP/assets/audio/race_music.wav
+          echo "Asset count:"
+          find release/PSP/GAME/MarioKartPSP/assets -type f | wc -l
+          ls -lh release/PSP/GAME/MarioKartPSP/EBOOT.PBP
+
+      - name: Upload PSP game folder
+        uses: actions/upload-artifact@v6
+        with:
+          name: MarioKartPSP-GAME
+          path: release/PSP/GAME/MarioKartPSP/
